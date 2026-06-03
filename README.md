@@ -20,7 +20,7 @@ Access the dashboard at: [http://127.0.0.1:5000](http://127.0.0.1:5000)
 
 ---
 
-## 🛠️ Architecture & Tradeoffs (Interview Ready)
+## 🛠️ Architecture & Tradeoffs 
 
 ### 1. Modular Blueprint Design
 Instead of a single-file script, I implemented a **Modular Factory Pattern**.
