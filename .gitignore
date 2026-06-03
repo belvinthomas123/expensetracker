@@ -1,0 +1,12 @@
+venv/
+.env
+__pycache__/
+*.pyc
+instance/
+.pytest_cache/
+expenses.db
+.DS_Store
+*.webp
+*.png
+brain/
+scratch/

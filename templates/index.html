@@ -1,0 +1,190 @@
+{% extends "layout.html" %}
+{% block title %}Dashboard — SpendWise{% endblock %}
+
+{% block content %}
+
+<div class="topbar">
+    <div>
+        <div class="topbar-month">This month</div>
+        <h1 class="topbar-title">{{ now.strftime('%B %Y') }}</h1>
+    </div>
+    <button class="btn btn-primary" onclick="document.getElementById('add-form').scrollIntoView({behavior:'smooth'})">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add expense
+    </button>
+</div>
+
+<!-- Summary hero (Ledger style) -->
+<div class="summary-hero">
+    <div class="summary-hero-top">
+        <div>
+            <div class="summary-month-label">This month</div>
+            <div class="summary-month-name">{{ now.strftime('%B %Y') }}</div>
+        </div>
+        <div>
+            <div class="summary-total-label">Total spent</div>
+            <div class="summary-total-value">₹{{ "%.2f"|format(total) }}</div>
+        </div>
+    </div>
+    {% if breakdown %}
+    <div class="summary-breakdown-label">By category</div>
+    <div class="breakdown-list">
+        {% for item in breakdown %}
+        <div class="breakdown-row">
+            <div class="breakdown-dot" style="background:{{ item.color_hex }}"></div>
+            <span class="breakdown-name">{{ item.name }}</span>
+            <div class="breakdown-bar-wrap">
+                <div class="breakdown-bar"
+                     style="width:{{ [((item.total / total * 100) if total > 0 else 0), 2]|max }}%;
+                            background:{{ item.color_hex }}"></div>
+            </div>
+            <span class="breakdown-amt">₹{{ "%.2f"|format(item.total) }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-inline">No expenses this month yet.</div>
+    {% endif %}
+</div>
+
+<!-- Add form -->
+<div class="card" id="add-form" style="margin-bottom:20px">
+    <div class="card-header">
+        <span class="card-title">Add new expense</span>
+    </div>
+    <form action="/add" method="POST" class="expense-form">
+        <div class="form-row form-row--full">
+            <div class="form-group">
+                <label class="form-label">Title</label>
+                <input type="text" name="title" class="form-input"
+                       placeholder="e.g. Morning coffee" required maxlength="200">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Amount (₹)</label>
+                <input type="number" step="0.01" min="0.01" name="amount"
+                       class="form-input" placeholder="0.00" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Category</label>
+                <select name="category_id" class="form-input" required>
+                    <option value="" disabled selected>Select…</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Date</label>
+                <input type="date" name="expense_date" class="form-input"
+                       value="{{ today }}" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Note <span class="form-optional">optional</span></label>
+                <input type="text" name="note" class="form-input" placeholder="Any detail…">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Add expense</button>
+    </form>
+</div>
+
+<!-- Expense list -->
+<div class="expense-list-header">
+    <h2 class="expense-list-title">All expenses</h2>
+    <span class="expense-list-count">{{ expenses|length }} entr{% if expenses|length == 1 %}y{% else %}ies{% endif %}</span>
+</div>
+
+<!-- Filters -->
+<div class="filters-bar" style="margin-bottom:16px">
+    <div class="filters-label">Filter</div>
+    <form action="/" method="GET" class="filters-form">
+        <input type="text" name="title" class="form-input filter-input"
+               placeholder="Search title…" value="{{ request.args.get('title', '') }}">
+        <select name="category_id" class="form-input filter-input">
+            <option value="">All categories</option>
+            {% for cat in categories %}
+            <option value="{{ cat.id }}"
+                {% if request.args.get('category_id')|int == cat.id %}selected{% endif %}>
+                {{ cat.name }}
+            </option>
+            {% endfor %}
+        </select>
+        <div class="filter-dates">
+            <input type="date" name="from_date" class="form-input filter-input"
+                   value="{{ request.args.get('from_date', '') }}">
+            <span class="filter-to">to</span>
+            <input type="date" name="to_date" class="form-input filter-input"
+                   value="{{ request.args.get('to_date', '') }}">
+        </div>
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-primary">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                Search
+            </button>
+            <a href="/" class="btn btn-ghost">Clear</a>
+        </div>
+    </form>
+</div>
+
+<!-- Grouped by date (Ledger style) -->
+{% if expenses %}
+    {% set ns = namespace(current_date=None, date_total=0) %}
+    {% for expense in expenses %}
+        {% if expense.expense_date != ns.current_date %}
+            {% if ns.current_date is not none %}
+            </div><!-- close date-group -->
+            {% endif %}
+            {% set ns.current_date = expense.expense_date %}
+            <div class="date-group">
+            <div class="date-group-header">
+                <span class="date-group-label">{{ expense.expense_date.strftime('%d %b %Y') }}</span>
+                <span class="date-group-total">
+                    ₹{{ "%.2f"|format(expenses | selectattr('expense_date', 'eq', expense.expense_date) | sum(attribute='amount')) }}
+                </span>
+            </div>
+        {% endif %}
+        <div class="expense-item">
+            <div class="expense-item-accent" style="background:{{ expense.category.color_hex }}"></div>
+            <div class="expense-item-body">
+                <div class="expense-item-title">{{ expense.title }}</div>
+                {% if expense.note %}
+                <div class="expense-item-note">{{ expense.note }}</div>
+                {% endif %}
+            </div>
+            <div class="expense-item-right">
+                <div class="expense-item-amount">₹{{ "%.2f"|format(expense.amount) }}</div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span class="cat-badge"
+                          style="background:{{ expense.category.color_hex }}18;
+                                 color:{{ expense.category.color_hex }};
+                                 border:1px solid {{ expense.category.color_hex }}30">
+                        {{ expense.category.name }}
+                    </span>
+                    <div class="expense-item-actions">
+                        <a href="{{ url_for('main.edit', id=expense.id) }}" class="action-btn">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+                            Edit
+                        </a>
+                        <a href="{{ url_for('main.delete', id=expense.id) }}"
+                           class="action-btn action-btn--danger"
+                           onclick="return confirm('Delete this expense?')">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                            Delete
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+    </div>
+{% else %}
+<div class="empty-state">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" style="opacity:.25;display:block;margin:0 auto 12px"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+    No expenses found. Try adjusting your filters or add your first expense above.
+</div>
+{% endif %}
+
+{% endblock %}

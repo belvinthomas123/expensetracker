@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: expense_tracker
+    ports:
+      - "5433:5432" # Mapping to 5433 to avoid conflict with local postgres if running
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg://postgres:root@db:5432/expense_tracker
+      - SECRET_KEY=expense-tracker-secret
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
